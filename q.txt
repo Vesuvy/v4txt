@@ -1,0 +1,402 @@
+public class RelayCommand : ICommand
+    {
+        private readonly Action<object> _execute;
+        private readonly Predicate<object> _canExecute;
+
+        public RelayCommand(Action<object> execute, Predicate<object> canExecute = null)
+        {
+            _execute = execute;
+            _canExecute = canExecute;
+        }
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return _canExecute == null || _canExecute(parameter);
+        }
+
+        public void Execute(object parameter)
+        {
+            _execute(parameter);
+        }
+    }
+
+public abstract class ViewModelBase : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+class AuthorizationViewModel : ViewModelBase
+    {
+
+        private string? _login;
+        private string? _password;
+
+        public string? Login
+        {
+            get => _login;
+            set
+            {
+                _login = value;
+                OnPropertyChanged(nameof(Login));
+            }
+        }
+        public string? Password
+        {
+            get => _password;
+            set
+            {
+                _password = value;
+                OnPropertyChanged(nameof(Password));
+            }
+        }
+
+        public ICommand AuthorizationCommand { get; }
+
+
+        public AuthorizationViewModel()
+        {
+            AuthorizationCommand = new RelayCommand(Auth);
+        }
+
+        private void Auth(object obj)
+        {
+            using (RestaurantDbContext db = new RestaurantDbContext())
+            {
+                if (db.Employees.Any(e => e.Login == Login && e.Password == Password))
+                {
+                    //BondarevMT Ie2muJ_CyX
+                    // Scaffold-DbContext "Server=DESKTOP-LRLPTTK\SQLEXPRESS;Database=testdb;
+                    // Trusted_Connection=True;TrustServerCertificate=True;" Microsoft.EntityFrameworkCore.SqlServer
+                    // -OutputDir Models -Context CleanDbContext -f
+                    MessageBox.Show($"Здравствуйте, {Login}!");
+                    RestaurantWindow restaurantWindow = new RestaurantWindow();
+                    restaurantWindow.Show();
+                }
+                else
+                    MessageBox.Show("Ошибка при вводе");
+            }
+        }
+    }
+
+class AddDishViewModel : ViewModelBase
+    {
+        private string? _title;
+        public string? Title
+        {
+            get => _title;
+            set
+            {
+                _title = value;
+                OnPropertyChanged(nameof(Title));
+            }
+        }
+
+        private double? _weight;
+        public double? Weight
+        {
+            get => _weight;
+            set
+            {
+                _weight = value;
+                OnPropertyChanged(nameof(Weight));
+            }
+        }
+
+        private int? _categoryId;
+        public int? CategoryId
+        {
+            get => _categoryId;
+            set
+            {
+                _categoryId = value;
+                OnPropertyChanged(nameof(CategoryId));
+            }
+        }
+
+        private double? _cost;
+        public double? Cost
+        {
+            get => _cost;
+            set
+            {
+                _cost = value;
+                OnPropertyChanged(nameof(Cost));
+            }
+        }
+
+        private string? _availability;
+        public string? Availability
+        {
+            get => _availability;
+            set
+            {
+                _availability = value;
+                OnPropertyChanged(nameof(Availability));
+            }
+        }
+
+        public ObservableCollection<Category> Categories { get; set; }
+        
+        public ICommand FinishAddDishCommand { get; }
+
+        public AddDishViewModel()
+        {
+            LoadCategories();
+            FinishAddDishCommand = new RelayCommand(FinishAddDish);
+        }
+
+        private void LoadCategories()
+        {
+            using (RestaurantDbContext db = new RestaurantDbContext()) 
+            {
+                Categories = new ObservableCollection<Category>(db.Categories.ToList());
+                OnPropertyChanged(nameof(Categories));
+            }               
+        }
+
+        private void FinishAddDish(object obj)
+        {
+            using (RestaurantDbContext db = new RestaurantDbContext())
+            {
+                bool checkIsExist = db.Dishes.Any(ad => ad.Title == Title);
+                if (!checkIsExist)
+                {
+                    Dish dish = new Dish
+                    {
+                        Title = Title,
+                        Weight = Weight,
+                        CategoryId = CategoryId,
+                        Cost = Cost,
+                        Availability = Availability
+                    };
+                    db.Dishes.Add(dish);
+                    db.SaveChanges();
+                    MessageBox.Show($"Еда '{Title}' - успешно добавлена");
+                }
+                else
+                    MessageBox.Show("Ошибка при добавлении");
+            }
+        }
+    }
+
+class DishListViewModel : ViewModelBase
+    {
+        
+        private string? _title;
+        public string? Title
+        {
+            get => _title;
+            set
+            {
+                _title = value;
+                OnPropertyChanged(nameof(Title));
+            }
+        }
+
+        private double? _weight;
+        public double? Weight
+        {
+            get => _weight;
+            set
+            {
+                _weight = value;
+                OnPropertyChanged(nameof(Weight));
+            }
+        }
+
+        private int? _categoryId;
+        public int? CategoryId
+        {
+            get => _categoryId;
+            set
+            {
+                _categoryId = value;
+                OnPropertyChanged(nameof(CategoryId));
+            }
+        }
+
+        private double? _cost;
+        public double? Cost
+        {
+            get => _cost;
+            set
+            {
+                _cost = value;
+                OnPropertyChanged(nameof(Cost));
+            }
+        }
+
+        private string? _availability;
+        public string? Availability
+        {
+            get => _availability;
+            set
+            {
+                _availability = value;
+                OnPropertyChanged(nameof(Availability));
+            }
+        }
+        private ObservableCollection<Dish>? _dishes;
+        public ObservableCollection<Dish>? Dishes
+        {
+            get => _dishes;
+            set
+            {
+                _dishes = value;
+                OnPropertyChanged(nameof(Dishes));
+            }
+        }
+        public ObservableCollection<Category>? Categories { get; set; }
+
+        public ICommand GoToAddDishWindowCommand { get; }
+
+        public DishListViewModel()
+        {
+            LoadCategories();
+            LoadDishes();
+            GoToAddDishWindowCommand = new RelayCommand(GoToAddDishWindow);
+        }
+
+        private void LoadCategories()
+        {
+            using (RestaurantDbContext db = new RestaurantDbContext())
+            {
+                Categories = new ObservableCollection<Category>(db.Categories.ToList());
+                OnPropertyChanged(nameof(Categories));
+            }
+                
+        }
+        private void LoadDishes()
+        {
+            using (RestaurantDbContext db = new RestaurantDbContext())
+            {
+                Dishes = new ObservableCollection<Dish>(db.Dishes.Include(d => d.Category).ToList());
+            }
+        }
+
+        private void GoToAddDishWindow(object obj)
+        {
+            AddDishWindow addDishWindow = new AddDishWindow();
+            addDishWindow.Show();
+        }
+    }
+
+class RestaurantViewModel : ViewModelBase
+    {
+        private ObservableCollection<OrderContent>? _orderContents;
+
+        public ObservableCollection<OrderContent>? OrderContents
+        {
+            get => _orderContents;
+            set
+            {
+                _orderContents = value;
+                OnPropertyChanged(nameof(OrderContents));
+            }
+        }
+
+        public ICommand ShowDishCommand { get; }
+
+        public RestaurantViewModel()
+        {
+            ShowDishCommand = new RelayCommand(ShowDish);
+            LoadOrderContents();
+        }
+
+        private void LoadOrderContents()
+        {
+            using (RestaurantDbContext db = new RestaurantDbContext())
+            {
+                OrderContents = new ObservableCollection<OrderContent>(db.OrderContents
+                    .Include(o => o.Order)
+                    .Include(o => o.Dish)
+                    //.Include(o => o.Status)
+                    .ToList()
+                    );
+            }
+        }
+
+        private void ShowDish(object obj)
+        {
+            DishListWindow dishListWindow = new DishListWindow();
+            dishListWindow.ShowDialog();
+        }
+    }
+
+<Grid>
+        <StackPanel Orientation="Vertical" Margin="15">
+            <TextBlock Text="Название" />
+            <TextBox 
+                Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0 0 0 10" Height="25"/>
+            <TextBlock Text="Вес" />
+            <TextBox 
+                 Text="{Binding Weight, UpdateSourceTrigger=PropertyChanged}" Margin="0 0 0 10" Height="25"/>
+            <TextBlock Text="Категория (1-9)" />
+            <ComboBox 
+                ItemsSource="{Binding Categories}"
+                DisplayMemberPath="Title"
+                SelectedValuePath="Id"
+                SelectedValue="{Binding CategoryId, UpdateSourceTrigger=PropertyChanged}"
+                Margin="0 0 0 10"
+                />
+            <TextBlock Text="Цена" />
+            <TextBox 
+                Text="{Binding Cost, UpdateSourceTrigger=PropertyChanged}" Margin="0 0 0 10" Height="25"/>
+            <TextBlock Text="Доступность (да\нет)" />
+            <TextBox 
+                 Text="{Binding Availability, UpdateSourceTrigger=PropertyChanged}" Margin="0 0 0 10" Height="25"/>
+
+            <Button Content="Добавить"
+                Command="{Binding FinishAddDishCommand}" Height="30"/>
+        </StackPanel>
+        
+    </Grid>
+
+<Grid>
+        <ListView x:Name="Dishes" Grid.Column="0" ItemsSource="{Binding Dishes}">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Название:" DisplayMemberBinding="{Binding Title}" Width="100"/>
+                    <GridViewColumn Header="Вес:" DisplayMemberBinding="{Binding Weight}" Width="100"/>
+                    <GridViewColumn Header="Категория:" DisplayMemberBinding="{Binding Category.Title}" Width="100"/>
+                    <GridViewColumn Header="Цена:" DisplayMemberBinding="{Binding Cost}" Width="100"/>
+                    <GridViewColumn Header="Доступность:" DisplayMemberBinding="{Binding Availability}" Width="100"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+        <Button Content="Добавить еду" Margin="682,378,10,10"
+                Command="{Binding GoToAddDishWindowCommand}"/>
+    </Grid>
+
+<Grid Background="AliceBlue">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="130"/>
+        </Grid.ColumnDefinitions>
+
+        <ListView x:Name="Orders" Grid.Column="0" ItemsSource="{Binding OrderContents}">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Еда:" DisplayMemberBinding="{Binding Dish.Title}" Width="100"/>
+                    <GridViewColumn Header="Столик:" DisplayMemberBinding="{Binding Order.Table}" Width="100"/>
+                    <GridViewColumn Header="Статус:" DisplayMemberBinding="{Binding Status}" Width="100"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <StackPanel Grid.Column="1"
+        HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Height="40">
+            <Button Content="Список еды" Command="{Binding ShowDishCommand}"/>
+        </StackPanel>
+    </Grid>
